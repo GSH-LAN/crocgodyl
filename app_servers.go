@@ -79,6 +79,7 @@ func (a *Application) GetServers() ([]*AppServer, error) {
 		Data []struct {
 			Attributes *AppServer `json:"attributes"`
 		} `json:"data"`
+		PaginationMeta
 	}
 	if err = json.Unmarshal(buf, &model); err != nil {
 		return nil, err
@@ -89,7 +90,30 @@ func (a *Application) GetServers() ([]*AppServer, error) {
 		servers = append(servers, s.Attributes)
 	}
 
-	return servers, nil
+	allServers := servers
+	for model.PaginationMeta.Meta.Pagination.CurrentPage <= model.PaginationMeta.Meta.Pagination.TotalPages {
+		req = a.newRequest("GET", fmt.Sprintf("/servers?page=%d", model.PaginationMeta.Meta.Pagination.CurrentPage + 1), nil)
+		res, err = a.Http.Do(req)
+		if err != nil {
+			return nil, err
+		}
+
+		buf, err = validate(res)
+		if err != nil {
+			return nil, err
+		}
+
+		if err = json.Unmarshal(buf, &model); err != nil {
+			return nil, err
+		}
+
+		for _, s := range model.Data {
+			allServers = append(allServers, s.Attributes)
+		}
+
+	}
+
+	return allServers, nil
 }
 
 func (a *Application) GetServer(id int) (*AppServer, error) {
